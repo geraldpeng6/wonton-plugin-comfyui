@@ -12,7 +12,7 @@
 #   scripts/dev.sh token                      用户令牌：浏览器登录和调接口都用它
 #   scripts/dev.sh session [--new]            建立用户会话（--new 重建），cookie 存在 .wonton/session.cookies
 #   scripts/dev.sh web [--jar <文件>] [--fresh] [--sso] [<路径> [<curl 参数>…]]
-#                                             以用户的身份请求插件网页；--sso 会从清单 webui.path 的入口提交 JS 自动表单并跟完重定向
+#                                             以用户的身份请求插件网页；--sso 会提交 JS 自动表单并跟完重定向
 #   scripts/dev.sh api <方法> <路径> [<curl 参数>…] 带用户令牌调用核心管理接口
 #   scripts/dev.sh egress <地址>                读取设置后用同样的 restarts 和直连网段设置出口代理
 #   scripts/dev.sh mcp list                   Bot 经 MCP 总线能调到的工具（JSON）
@@ -20,12 +20,17 @@
 #   scripts/dev.sh mcp --direct list|call …   直连工作区清单的 MCP 服务，只调试插件本身，不走总线权限和确认
 #   scripts/dev.sh approve [--watch]          用主人令牌批准确认卡片；--watch 持续批准，Ctrl-C 停止
 #   scripts/dev.sh smoke                      对工作区的插件跑合并前的端到端冒烟：起一套一次性实例，跑完清理
-#   scripts/dev.sh probes [<探针名>…]          对装着的工作区插件跑冒烟探针（web_assert、identity_check、mcp、data_write、data_check），不起新实例；给了名字就只跑那几项
+#   scripts/dev.sh probes [<探针名>…]          对装着的工作区插件跑冒烟探针（web_assert、identity_check、mcp），不起新实例；给了名字就只跑那几项
 #   scripts/dev.sh pair                       在终端里出配对二维码，给 App 用
 #   scripts/dev.sh down                       停下核心，数据都留着；插件的容器由核心管，照常运行
 #   scripts/dev.sh reset                      删掉当前实例的插件容器和网络，保留核心和 .wonton 数据
 #   scripts/dev.sh purge [--yes]              删掉整个开发环境；非交互执行必须带 --yes
-#   scripts/dev.sh kit-update [<ref>]          更新开发套件（默认 main），不需要 Docker；完整说明见 develop.md 的“开发环境”
+#   scripts/dev.sh kit-update [<ref>]          更新开发套件（默认 main），不需要 Docker
+#
+# 第一次 up 时可以用环境变量定下：WONTON_CORE_IMAGE（核心镜像，默认 ghcr.io/geraldpeng6/wonton-core:beta）、
+# WONTON_INSTANCE（实例名）、WONTON_PORT（网页端口，隧道用下一个端口）、WONTON_PULL=never（用本机构建的核心镜像，
+# 不拉取）。之后改 .wonton/.env 再 up。WONTON_DEV_CORE_SUBNET（如 10.214.1.0/24）让核心网络用这个子网，不占 Docker 的
+# 默认地址池（只有约 30 个网络，几套栈共用一台 Docker 时会用光）；写进 .wonton/compose.subnet.yaml，栈拆掉之前一直沿用。
 set -euo pipefail
 # forget_environment 会清掉所有 WONTON_*，先留一份。
 core_subnet="${WONTON_DEV_CORE_SUBNET:-}"
@@ -393,25 +398,20 @@ logs() {
   docker logs -f --tail 200 "wonton-$instance--${id//./-}--$1"
 }
 
-# 插件网页入口：核心把清单的 webui.path（没写就是 /）拼在域名后面，从这里开始走应用的登录链。
-plugin_web_entry() {
+plugin_web_url() {
   local id="$1" list
   list="$(api GET /_wonton/api/plugins)" || die "列不出插件：$(error_text "$list")"
   python3 - "$list" "$id" <<'PY'
+import urllib.parse
 import json, sys
 plugin = next((p for p in json.loads(sys.argv[1])["plugins"] if p["id"] == sys.argv[2]), None)
 if plugin is None:
     sys.exit(f"{sys.argv[2]} 还没装：先 scripts/dev.sh install")
 if not plugin.get("web_url"):
     sys.exit(f"{sys.argv[2]} 没有网页入口（清单里没写 webui）")
-print(plugin["web_url"])
+parts = urllib.parse.urlsplit(plugin["web_url"])
+print(f"{parts.scheme}://{parts.netloc}")
 PY
-}
-
-plugin_web_url() {
-  local entry
-  entry="$(plugin_web_entry "$1")" || exit 1
-  python3 -c 'import urllib.parse, sys; p = urllib.parse.urlsplit(sys.argv[1]); print(f"{p.scheme}://{p.netloc}")' "$entry"
 }
 
 session_jar() {
@@ -493,19 +493,19 @@ PY
 
 # 登进核心，再走一遍插件网页的登录跳转；--sso 还会跟完 JS 自动提交的隐藏字段表单。
 session_into() {
-  local jar="$1" new="$2" sso="${3:-}" owner entry
+  local jar="$1" new="$2" sso="${3:-}" owner url
   [[ -n "$sso" ]] && new=1
   mkdir -p "$(dirname "$jar")"
   [[ -n "$new" ]] && rm -f "$jar"
   [[ -f "$jar" ]] && return 0
   owner="$(token)"
-  entry="$(plugin_web_entry "$(plugin_id)")"
+  url="$(plugin_web_url "$(plugin_id)")"
   curl -sS --noproxy '*' --fail-with-body -o /dev/null -c "$jar" --data-urlencode "token=$owner" \
     "$base_url/_wonton/login" || die "用户令牌登录不了核心"
   if [[ -n "$sso" ]]; then
-    sso_form_login "$jar" "$entry"
+    sso_form_login "$jar" "$url/"
   else
-    curl -sS --noproxy '*' -o /dev/null -L -b "$jar" -c "$jar" -H 'Accept: text/html' "$entry" ||
+    curl -sS --noproxy '*' -o /dev/null -L -b "$jar" -c "$jar" -H 'Accept: text/html' "$url/" ||
       die "走不通插件网页的登录跳转"
   fi
 }
@@ -761,8 +761,6 @@ if [[ "${1:-}" == kit-update ]]; then
 fi
 
 need docker curl python3
-# 起容器前剥掉宿主机的 Docker 客户端代理（见 lib.sh 的 strip_docker_proxies；空参数=用 $state 下的默认目录）。
-strip_docker_proxies ""
 case "${1:-}" in
   up) up ;;
   install) install_plugin "${@:2}" ;;
