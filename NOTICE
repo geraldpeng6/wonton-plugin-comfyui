@@ -1,14 +1,34 @@
-图标
-====
+许可与声明
+==========
 
-`icon.svg` 为本仓库原创，按插件规范的线条风格手写，未用图片模型生成。从模板新建的插件换成自己的图标时，这里按实际情况重写。
+ComfyUI 标志
+------------
 
-许可证
-------
+图标：ComfyUI
+来源：https://github.com/Comfy-Org/ComfyUI_frontend/blob/main/public/assets/images/comfy-icon-512.png
+     （main 分支，随提交固定）
+版权：Copyright (c) Comfy Org
+商标：ComfyUI 名称和标志是 Comfy Org 的商标。本插件是社区的第三方打包，不是 ComfyUI
+官方出品，也和 Comfy Org 没有任何合作关系。
+处理：官方位图标志原样使用，不改颜色、不变形；标志自带深色底、512×512 满幅正方形，
+作为 icon.png。
+
+上游许可证全文
+
+ComfyUI 的代码按 GNU General Public License v3.0 发布
+（https://github.com/comfyanonymous/ComfyUI/blob/main/LICENSE）：
+
+本插件包含的 ComfyUI 是上游发布版本的完整副本，不修改其源码；GPL-3.0 许可证全文见上游
+仓库 LICENSE 文件，此处不重复。插件包引用的上游 Python 依赖（requirements.txt、
+manager_requirements.txt，含 comfyui-frontend-package、comfyui-workflow-templates、
+comfyui-manager 等）随其上游发布渠道分发，许可证以上游声明为准。
+
+插件包许可证
+------------
 
 MIT License
 
-Copyright (c) 2026 Wonton plugin authors
+Copyright (c) 2026 geraldpeng6
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
