@@ -1,31 +1,26 @@
-# 云吞插件模板
+# 云吞插件：ComfyUI
 
-开发流程见[插件开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)。
+[ComfyUI](https://www.comfy.org) 是节点式的生图工作流应用。这个插件把它装在云吞里：网页经云吞网关打开，显卡由云吞交给它，数据放在插件数据目录。开发流程见[插件开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)。
 
-这是一个能安装的示例插件 `app.example.hello`：使用 nginx 官方镜像显示问候页，经网关的 `sso: proxy` 注入用户名，页面显示“你好，<用户名>”。示例没有应用账号、持久化数据或 MCP 工具。
+## 模型
 
-## 示例文件
+模型不进镜像，放在插件数据目录的 `models/` 下（装好后对应宿主路径 `<云吞数据>/apps/` 里的 `data/`），重启后都在：
 
-| 路径 | 内容 |
+| 目录 | 放什么 |
 | --- | --- |
-| `docker-compose.yml` | 示例清单、nginx 服务和三个 `configs` |
-| `web/default.conf.template` | nginx 配置，启用 SSI 回显用户名并提供健康检查入口；只放行来自核心地址（`${WONTON_CORE_ADDRESS}`）的请求，其余来源 403 |
-| `web/index.html` | 问候页 |
-| `web/tokens.css` | 页面主题变量的后备值 |
-| `tabs/` | 示例主页的底栏图标 |
-| `screenshots/home.png` | 商店详情页的示例截图 |
-| `scripts/smoke-probes.sh` | 检查真实页面和网关注入身份的插件探针 |
+| `models/checkpoints/` | 大模型（checkpoint） |
+| `models/diffusion_models/`、`models/text_encoders/`、`models/vae/` | 分体式模型的各部分 |
+| `models/loras/` | LoRA |
+| `models/upscale_models/`、`models/controlnet/` | 放大、控制模型 |
 
-从模板创建自己的插件后，替换示例清单、网页和素材；具体步骤见[写插件](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md#写插件)。
+装好的 ComfyUI-Manager 也能在网页里直接下载模型和自定义节点（要走出口代理或直连）。
 
-## 更新开发套件
+推荐的起步模型：SDXL base 1.0（`sd_xl_base_1.0.safetensors`，约 6.9 GB），1024×1024 生成最低约 8 GB 显存，32 GB 显卡很宽裕；更大的模型按文件大小和官方说明自估显存。
 
-```bash
-scripts/dev.sh kit-update
-```
+## 镜像
 
-在从模板新建的插件仓库中更新套件；本仓库是套件源头，执行时只提示并退出。版本、可选引用和自定义脚本约定见[开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md#更新开发套件)。
+上游（comfyanonymous/ComfyUI）没有发布官方镜像，`images/comfyui/Dockerfile` 基于官方 PyTorch cu128 运行时镜像构建（RTX 50 系需要 CUDA 12.8+），ComfyUI 用上游发布的 v0.44.0，不改上游源码。构建由 `scripts/publish.sh` 完成。
 
 ## 图标
 
-`icon.svg` 是本仓库原创线条图标，按本仓库 MIT 许可证分发，见 [NOTICE](NOTICE)。
+`icon.png` 来自 ComfyUI 前端仓库的官方标志，ComfyUI 名称和标志是 Comfy Org 的商标；来源、许可和商标说明见 [NOTICE](NOTICE)。

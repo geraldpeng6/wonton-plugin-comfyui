@@ -1,78 +1,112 @@
-# 示例插件：nginx 显示一个网页，向登录的人问好。改成自己的应用见 https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md#写插件。
+# ComfyUI：节点式生图工作流。上游没有发布官方镜像，镜像由 images/comfyui/Dockerfile 构建
+# （PyTorch cu128 官方基础镜像 + 上游 v0.44.0 发布源码），发布时由 scripts/publish.sh 推送并按摘要固定。
+# RTX 50 系需要 CUDA 12.8+，清单 arch 只写 amd64。
 services:
-  web:
-    # 镜像按摘要固定（多架构镜像写清单列表的摘要），标签只给人看。
-    image: nginx:1.31.7-alpine@sha256:892bb2152464f0c5d8972593a5f5afaf8054552580b699d95f8ff4af08c2d33d
+  init:
+    # 同一镜像各写一遍，不用锚点。启动前在数据目录建好模型目录树，属主跟 user 走（PUID:PGID）。
+    image: ghcr.io/geraldpeng6/comfyui:0.1.0
+    user: "${PUID}:${PGID}"
+    entrypoint: ["mkdir", "-p"]
+    command:
+      - /data/models/checkpoints
+      - /data/models/diffusion_models
+      - /data/models/loras
+      - /data/models/vae
+      - /data/models/text_encoders
+      - /data/models/clip
+      - /data/models/upscale_models
+      - /data/models/controlnet
+      - /data/models/configs
+      - /data/custom_nodes
+      - /data/user
+      - /data/input
+      - /data/output
+      - /data/home
+    volumes:
+      - ${WONTON_APP_DATA}:/data
+    network_mode: none
+    restart: "no"
+  comfyui:
+    image: ghcr.io/geraldpeng6/comfyui:0.1.0
+    # ComfyUI 是纯 Python 应用，以任意 uid 运行；数据目录文件归用户的用户。
+    user: "${PUID}:${PGID}"
     environment:
-      # 网关代登录：SSI 回显的 Remote-User 只信核心带来的。官方镜像启动时对 templates 目录里的
-      # *.template 做 envsubst，把下面的地址换进 nginx 配置（见 web/default.conf.template）。
-      WONTON_CORE_ADDRESS: ${WONTON_CORE_ADDRESS}
-    # 包里的文件经 configs 交给容器（核心在启动前写进去），不能用卷挂载。
-    configs:
-      - source: site
-        target: /etc/nginx/templates/default.conf.template
-      - source: page
-        target: /usr/share/nginx/html/index.html
-      - source: tokens
-        target: /usr/share/nginx/html/tokens.css
+      TZ: ${TZ}
+      # 镜像默认 HOME 是 /root，按 PUID 运行时不可写；torch、节点的缓存放数据目录。
+      HOME: /data/home
+    volumes:
+      - ${WONTON_APP_DATA}:/data
+    # PyTorch 用共享内存传进程间张量，默认 64 MiB 不够；规范对 ComfyUI 的示例也是 8g。
+    shm_size: 8g
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    # 查的是 API 真的能答话（无鉴权的系统状态接口），不只是进程活着。
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8188/api/system_stats', timeout=5)"]
       interval: 30s
-      timeout: 5s
-      start_period: 30s
-      start_interval: 1s
-
-configs:
-  site:
-    file: web/default.conf.template
-  page:
-    file: web/index.html
-  tokens:
-    file: web/tokens.css
+      timeout: 10s
+      start_period: 3m
+      start_interval: 5s
 
 x-wonton:
-  spec: "0.5"
-  # 换成你自己的：反向域名形式，装上以后不能改。
-  id: app.example.hello
-  version: 0.1.1
+  spec: "0.6"
+  # 反向域名：上游是 comfy.org。
+  id: org.comfy.comfyui
+  version: 0.1.0
   kind: app
-  title: { zh: 你好, en: Hello }
-  description: { zh: 向登录的人问好的示例网页, en: An example page that greets whoever is signed in }
-  icon: icon.svg
+  title: { en: ComfyUI }
+  description:
+    zh: 用节点工作流在自家显卡上生图
+    en: Generate images with node-based workflows on your own GPU
+  icon: icon.png
   notices: [NOTICE]
-  screenshots: [screenshots/home.png]
-  author: { name: Example }
-  homepage: https://nginx.org
-  # 应用（这里是 nginx）的许可证；插件包自己的许可证写在仓库的 LICENSE 里。
-  license: BSD-2-Clause
+  screenshots: [screenshots/generated.png, screenshots/workflow.png, screenshots/workflows.png]
+  author: { name: geraldpeng6, url: https://github.com/geraldpeng6 }
+  homepage: https://www.comfy.org
+  # 上游 ComfyUI 的许可证；插件包自己的许可证写在仓库的 LICENSE 里。
+  license: GPL-3.0-only
   tags:
-    zh: [工具]
-    en: [Tools]
+    zh: [AI, 视频]
+    en: [AI, Video]
   about:
     zh: |
-      一个示例网页：登录以后，页面会向你问好。新建插件时可以照着改。
+      把 ComfyUI 装在自己家里，用节点工作流在自家显卡上生图、生视频，数据不出门。
+
+      有 NVIDIA 显卡就自动用显卡。模型不进镜像：把模型文件放进插件数据目录的 models/ 下
+      （比如 checkpoints/ 放大模型），装好的 ComfyUI-Manager 也能在网页里直接下载。
+      想跑主流大图模型：SDXL base 1.0 约 6.9 GB，1024×1024 生成最低约 8 GB 显存，
+      32 GB 显卡很宽裕；更大模型按文件大小自估。
+
+      网页里能装自定义节点（Manager），出网权限就是给它们下载用的：节点是别人的代码，
+      装之前自己看一眼。
     en: |
-      An example page: once you are signed in, the page says hello. Copy it as a starting point for a new plugin.
-  release_notes: { zh: 名字和说明更新。, en: Product name and description update. }
+      Run ComfyUI at home and generate images and videos with node-based workflows on your own
+      GPU, keeping data on your machine.
+
+      Your NVIDIA GPU is used automatically. Models are not part of the image: put model files
+      into the plugin data directory under models/ (checkpoints/ for checkpoints), or download
+      them in the web UI with the bundled ComfyUI-Manager. A popular starting point: SDXL base
+      1.0 is about 6.9 GB and needs roughly 8 GB of VRAM for 1024×1024; a 32 GB card has plenty
+      of headroom.
+
+      Custom nodes can be installed from the web UI (Manager); the internet permission exists
+      for their downloads. Custom nodes are third-party code — review before installing.
+  release_notes: { zh: 第一版。, en: First release. }
+  # ComfyUI 没有登录页（网关挡着，只有登录用户打得开），也不支持 OIDC 或代理用户名，所以 none。
   webui:
-    service: web
-    port: 80
-    # 示例页回显网关注入的用户名，见 https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#网关代登录sso-proxy。
-    sso: proxy
-    proxy:
-      headers:
-        Remote-User: "{user}"
-  # 能放到底栏的页面，见 https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#底栏页面tabs。放不放由用户决定。
-  tabs:
-    - id: home
-      title: { zh: 主页, en: Home }
-      icon: tabs/home.svg
-      icon_selected: tabs/home-fill.svg
-      path: /
-      # 这个页面没做适配，用默认的 inset：页面夹在 App 的栏中间，不会被挡。
-      # 想让内容从栏下滚过，写 layout: edge-to-edge，并用 --wonton-inset-* 留出栏的位置。
-  permissions: []
-  # 上游 nginx 官方镜像，amd64 和 arm64 都有；上游没写最低内存，按本机空闲实测取整（实测约 24M，取 64M）。
+    service: comfyui
+    port: 8188
+    sso: none
+  # 出网：Manager 和自定义节点下载模型、节点用。
+  permissions:
+    - devices.gpu
+    - network.egress
+  # 显卡给 comfyui 服务；required：本插件就是为显卡准备的，CPU 跑不动主流模型。
+  gpu:
+    services: [comfyui]
   requirements:
-    arch: [amd64, arm64]
-    memory: 64M
+    arch: [amd64]
+    # 空闲约 1.5 GiB，跑 SDXL 生成时峰值更高；取 4G。
+    memory: 4G
+    gpu: { need: required }
