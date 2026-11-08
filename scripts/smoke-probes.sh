@@ -23,14 +23,14 @@ data_write() {
     --data-binary "$body" -H 'Content-Type: application/json' \
     "$url/userdata/workflows%2Fsmoke-$marker.json?overwrite=true" >/dev/null ||
     { echo "POST $url/userdata/workflows%2Fsmoke-$marker.json 失败（jar=$SMOKE_JAR 大小=$(wc -c <"$SMOKE_JAR" 2>/dev/null) wonton_app=$(grep -c wonton_app "$SMOKE_JAR" 2>/dev/null)）"; return 1; }
-  printf '%s' "$marker" > "$SMOKE_STATE/comfyui-data-marker" || { echo "存不了标记：$SMOKE_STATE"; return 1; }
+  printf '%s' "$marker" > "$SMOKE_STATE" || { echo "存不了标记：$SMOKE_STATE"; return 1; }
 }
 
 data_check() {
   local marker got url
   [[ -n "${SMOKE_WEB_URL:-}" ]] || { echo "SMOKE_WEB_URL 未设置（探针套件没取到网页地址）"; return 1; }
   url="${SMOKE_WEB_URL%/}"
-  marker="$(cat "$SMOKE_STATE/comfyui-data-marker" 2>/dev/null)" || { echo "读不到标记"; return 1; }
+  marker="$(cat "$SMOKE_STATE" 2>/dev/null)" || { echo "读不到标记"; return 1; }
   got="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" "$url/userdata/workflows%2Fsmoke-$marker.json")" ||
     { echo "工作流 smoke-$marker.json 读不回来"; return 1; }
   grep -qF "\"marker\":\"$marker\"" <<<"$got" ||
