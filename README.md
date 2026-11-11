@@ -1,6 +1,6 @@
 # 云吞插件：ComfyUI
 
-[ComfyUI](https://www.comfy.org) 是节点式的生图工作流应用。这个插件把它装在云吞里：网页经云吞网关打开，显卡由云吞交给它，数据放在插件数据目录。开发流程见[插件开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)。
+[ComfyUI](https://www.comfy.org) 是节点式的生图工作流应用。这个插件把它装在云吞里：网页经云吞网关打开，显卡由云吞交给它，数据放在插件数据目录。开发流程见[插件开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md)。
 
 ## 模型
 
