@@ -55,10 +55,10 @@ x-wonton:
   id: org.comfy.comfyui
   version: 0.1.0
   kind: app
-  title: { en: ComfyUI }
+  title: { zh: AI 画图（ComfyUI）, en: AI Image Studio (ComfyUI) }
   description:
-    zh: 用节点工作流在自家显卡上生图
-    en: Generate images with node-based workflows on your own GPU
+    zh: 用家里的显卡让 AI 画图、做视频：把步骤像积木一样连起来，放进模型就能出图。上手有门槛，适合愿意折腾的 AI 绘画爱好者。
+    en: "Make AI images and videos on your own graphics card: connect the steps like building blocks, add a model and generate. There's a learning curve — best for AI art hobbyists."
   icon: icon.png
   notices: [NOTICE]
   screenshots: [screenshots/generated.png, screenshots/workflow.png, screenshots/workflows.png]
@@ -71,7 +71,7 @@ x-wonton:
     en: [AI, Video]
   about:
     zh: |
-      把 ComfyUI 装在自己家里，用节点工作流在自家显卡上生图、生视频，数据不出门。
+      把 ComfyUI 装在自己家里，在自己的显卡上生成图片和视频，数据不出门。
 
       有 NVIDIA 显卡就自动用显卡。模型不进镜像：把模型文件放进插件数据目录的 models/ 下
       （比如 checkpoints/ 放大模型），装好的 ComfyUI-Manager 也能在网页里直接下载。
@@ -81,8 +81,8 @@ x-wonton:
       网页里能装自定义节点（Manager），出网权限就是给它们下载用的：节点是别人的代码，
       装之前自己看一眼。
     en: |
-      Run ComfyUI at home and generate images and videos with node-based workflows on your own
-      GPU, keeping data on your machine.
+      Run ComfyUI at home: generate images and videos on your own graphics card, with data
+      staying on your machine.
 
       Your NVIDIA GPU is used automatically. Models are not part of the image: put model files
       into the plugin data directory under models/ (checkpoints/ for checkpoints), or download
